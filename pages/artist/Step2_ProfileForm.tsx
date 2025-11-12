@@ -39,15 +39,6 @@ const Step2_ProfileForm: React.FC<ProfileFormProps> = ({
     if (!formData.gender) newErrors.gender = 'Gender is required'
     if (!formData.city?.trim()) newErrors.city = 'City is required'
 
-
-    const langs = Array.isArray(formData.languages)
-      ? formData.languages
-      : (formData.languages || '')
-          .split(',')
-          .map(s => s.trim())
-          .filter(Boolean)
-    if (!langs.length) newErrors.languages = 'Languages known is required'
-
     const exp = Number(formData.experienceYears)
     if (Number.isNaN(exp) || exp < 0) newErrors.experienceYears = 'Valid years of experience is required'
 
@@ -63,55 +54,32 @@ const Step2_ProfileForm: React.FC<ProfileFormProps> = ({
     setIsSubmitting(true)
 
     try {
-      // Build JSON payload instead of FormData
+      // Build JSON payload limited to backend DTO fields
+      // SimpleCreateArtistProfileDto: artistTypeId, gender, location, experienceYears, dateOfBirth
       const payload: Record<string, any> = {}
 
-      Object.entries(formData).forEach(([key, value]) => {
-        // Normalize enums for gender and maritalStatus to backend format
-        if (key === 'gender') {
-          const raw = String(value || '').trim()
-          const normalized = raw.toUpperCase().replace(/\s+/g, '_')
-          const allowed = ['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY']
-          payload['gender'] = allowed.includes(normalized)
-            ? normalized
-            : normalized || ''
-          return
-        }
+      // artistTypeId
+      if (formData.artistTypeId) {
+        payload.artistTypeId = String(formData.artistTypeId)
+      }
 
-        // Do not send the category name; send the ID under artistTypeId
-        if (key === 'category') return
+      // gender (normalize to uppercase with underscores)
+      const rawGender = String(formData.gender || '').trim()
+      const normalizedGender = rawGender.toUpperCase().replace(/\s+/g, '_')
+      const allowed = ['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY']
+      payload.gender = allowed.includes(normalizedGender)
+        ? normalizedGender
+        : normalizedGender || ''
 
-        if (key === 'artistTypeId') {
-          if (value !== null && value !== undefined) {
-            payload['artistTypeId'] = String(value)
-          }
-          return
-        }
+      // location (map from city)
+      payload.location = String(formData.city || '').trim()
 
-        if (key === 'languages') {
-          const langs = Array.isArray(value)
-            ? value
-            : String(value || '')
-                .split(',')
-                .map(s => s.trim())
-                .filter(Boolean)
-          payload['languages'] = langs
-          return
-        }
+      // experienceYears (number)
+      const expYears = Number(formData.experienceYears)
+      payload.experienceYears = Number.isNaN(expYears) ? 0 : expYears
 
-        if (key === 'experienceYears') {
-          const num = Number(value)
-          payload['experienceYears'] = Number.isNaN(num) ? value : num
-          return
-        }
-
-        // Skip deprecated field
-        if (key === 'maritalStatus') return
-
-        if (value !== null && value !== undefined) {
-          payload[key] = value
-        }
-      })
+      // dateOfBirth (string, e.g. YYYY-MM-DD)
+      payload.dateOfBirth = String(formData.dateOfBirth || '').trim()
 
       const result = await onboardingService.submitOnboardingJson(payload)
       console.log('Onboarding successful:', result.message)

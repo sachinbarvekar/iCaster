@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Card } from '../../components/Card'
 import { Recruiter, VerificationStatus } from '../../types'
 import {
@@ -6,6 +6,7 @@ import {
   ClockIcon,
   ExclamationCircleIcon,
 } from '../../components/icons/IconComponents'
+import { getRecruiterProfile } from '@/services/recruiterProfileService'
 
 const initialRecruiterData: Recruiter = {
   name: 'Alex Morgan',
@@ -132,6 +133,25 @@ const VerificationStatusCard: React.FC<{ status: VerificationStatus }> = ({
 export const RecruiterProfilePage = () => {
   const [recruiter, setRecruiter] = useState<Recruiter>(initialRecruiterData)
   const [formData, setFormData] = useState<Recruiter>(recruiter)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const data = await getRecruiterProfile()
+        setRecruiter(data)
+        setFormData(data)
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load profile')
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchProfile()
+  }, [])
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -154,6 +174,12 @@ export const RecruiterProfilePage = () => {
   return (
     <div className='max-w-4xl mx-auto'>
       <h2 className='text-3xl font-bold text-gray-900 mb-6'>My Profile</h2>
+
+      {error && (
+        <div className='mb-4 p-3 rounded-lg border border-red-200 bg-red-50 text-red-800 text-sm'>
+          {error}
+        </div>
+      )}
 
       <div className='space-y-8'>
         <VerificationStatusCard

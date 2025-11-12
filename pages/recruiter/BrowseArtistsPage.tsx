@@ -1,93 +1,13 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Card } from '../../components/Card'
 import { Artist, Page } from '../../types'
 import { SearchIcon } from '../../components/icons/IconComponents'
 import { Pagination } from '../../components/Pagination'
 import { useNavigate } from 'react-router-dom'
+import { browseArtists } from '../../services/recruiterArtistsService'
 
-const artists: Artist[] = [
-  {
-    id: 1,
-    name: 'Leo Rivera',
-    avatarUrl: 'https://picsum.photos/seed/leo/300/300',
-    bio: '3D artist specializing in character modeling and environment design.',
-    skills: ['Blender', 'ZBrush', 'Substance Painter'],
-    email: 'leo.rivera@example.com',
-    portfolioUrl: 'https://artstation.com/leo',
-  },
-  {
-    id: 2,
-    name: 'Sofia Chen',
-    avatarUrl: 'https://picsum.photos/seed/sofia/300/300',
-    bio: 'Illustrator and animator with a passion for vibrant storytelling.',
-    skills: ['Procreate', 'After Effects', 'Illustration'],
-    email: 'sofia.chen@example.com',
-    portfolioUrl: 'https://behance.net/sofia',
-  },
-  {
-    id: 3,
-    name: 'David Kim',
-    avatarUrl: 'https://picsum.photos/seed/david/300/300',
-    bio: 'Brand strategist and designer focused on creating memorable identities.',
-    skills: ['Branding', 'Figma', 'Typography'],
-    email: 'david.kim@example.com',
-    portfolioUrl: 'https://dribbble.com/david',
-  },
-  {
-    id: 4,
-    name: 'Chloe Bailey',
-    avatarUrl: 'https://picsum.photos/seed/chloe/300/300',
-    bio: 'Web developer and UI designer creating beautiful, intuitive interfaces.',
-    skills: ['React', 'UI/UX', 'Tailwind CSS'],
-    email: 'chloe.bailey@example.com',
-    portfolioUrl: 'https://github.com/chloe',
-  },
-  {
-    id: 5,
-    name: 'Marcus Jones',
-    avatarUrl: 'https://picsum.photos/seed/marcus/300/300',
-    bio: 'Photographer capturing stunning landscapes and portraits.',
-    skills: ['Photography', 'Lightroom', 'Photoshop'],
-    email: 'marcus.jones@example.com',
-    portfolioUrl: 'https://unsplash.com/marcus',
-  },
-  {
-    id: 6,
-    name: 'Isabella Rossi',
-    avatarUrl: 'https://picsum.photos/seed/isabella/300/300',
-    bio: 'Motion graphics artist bringing brands to life through animation.',
-    skills: ['Cinema 4D', 'Motion Graphics', 'Redshift'],
-    email: 'isabella.rossi@example.com',
-    portfolioUrl: 'https://vimeo.com/isabella',
-  },
-  {
-    id: 7,
-    name: 'Omar Gonzalez',
-    avatarUrl: 'https://picsum.photos/seed/omar/300/300',
-    bio: 'Game developer focused on indie titles with unique mechanics.',
-    skills: ['Unity', 'C#', 'Game Design'],
-    email: 'omar.gonzalez@example.com',
-    portfolioUrl: 'https://itch.io/omar',
-  },
-  {
-    id: 8,
-    name: 'Freya Schmidt',
-    avatarUrl: 'https://picsum.photos/seed/freya/300/300',
-    bio: 'A concept artist who creates breathtaking worlds for films and games.',
-    skills: ['Photoshop', 'Concept Art', 'World Building'],
-    email: 'freya.schmidt@example.com',
-    portfolioUrl: 'https://artstation.com/freya',
-  },
-  {
-    id: 9,
-    name: 'Kenji Tanaka',
-    avatarUrl: 'https://picsum.photos/seed/kenji/300/300',
-    bio: 'Minimalist graphic designer with a love for clean typography.',
-    skills: ['Graphic Design', 'InDesign', 'Minimalism'],
-    email: 'kenji.tanaka@example.com',
-    portfolioUrl: 'https://kenji.design',
-  },
-]
+// Remote data
+const ITEMS_PER_PAGE = 6
 
 const ArtistCard: React.FC<{ artist: Artist; onViewProfile: () => void }> = ({
   artist,
@@ -120,16 +40,36 @@ const ArtistCard: React.FC<{ artist: Artist; onViewProfile: () => void }> = ({
 
 export const BrowseArtistsPage= () => {
   const [currentPage, setCurrentPage] = useState(1)
-  const ITEMS_PER_PAGE = 6
+  const [artists, setArtists] = useState<Artist[]>([])
+  const [totalItems, setTotalItems] = useState(0)
+  const [searchSkills, setSearchSkills] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
 
   const handleViewProfile = (artist: Artist) => {
     navigate('/artist-profile', { state: { artist } })
   }
 
-  const indexOfLastArtist = currentPage * ITEMS_PER_PAGE
-  const indexOfFirstArtist = indexOfLastArtist - ITEMS_PER_PAGE
-  const currentArtists = artists.slice(indexOfFirstArtist, indexOfLastArtist)
+  useEffect(() => {
+    const fetchArtists = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await browseArtists({ page: currentPage, size: ITEMS_PER_PAGE, skills: searchSkills || undefined })
+        setArtists(res.items)
+        setTotalItems(res.totalElements)
+      } catch (e) {
+        console.error('Failed to fetch artists', e)
+        setError('Failed to load artists')
+        setArtists([])
+        setTotalItems(0)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchArtists()
+  }, [currentPage, searchSkills])
 
   return (
     <div>
@@ -141,9 +81,11 @@ export const BrowseArtistsPage= () => {
               <SearchIcon className='h-5 w-5 text-gray-400' />
             </div>
             <input
-              type='text'
+             type='text'
               className='block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary'
               placeholder='Search by skill...'
+              value={searchSkills}
+              onChange={e => setSearchSkills(e.target.value)}
             />
           </div>
           <button className='px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100 whitespace-nowrap'>
@@ -151,18 +93,27 @@ export const BrowseArtistsPage= () => {
           </button>
         </div>
       </div>
+      {error && (
+        <div className='text-red-600 text-sm mb-4'>{error}</div>
+      )}
       <div className='grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3'>
-        {currentArtists.map(artist => (
+        {artists.map(artist => (
           <ArtistCard
             key={artist.id}
             artist={artist}
             onViewProfile={() => handleViewProfile(artist)}
           />
         ))}
+        {loading && (
+          <div className='col-span-full text-center text-gray-500'>Loading...</div>
+        )}
+        {!loading && artists.length === 0 && (
+          <div className='col-span-full text-center text-gray-500'>No artists found</div>
+        )}
       </div>
       <Pagination
         currentPage={currentPage}
-        totalItems={artists.length}
+        totalItems={totalItems}
         itemsPerPage={ITEMS_PER_PAGE}
         onPageChange={page => setCurrentPage(page)}
         className='mt-8'

@@ -1,5 +1,6 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import Icon from '@/components/Icon'
+import artistService from '@/services/artistService'
 
 const ArtistIllustration: React.FC = () => (
   <svg
@@ -73,16 +74,57 @@ const ProfileChecklistItem: React.FC<{ title: string; completed: boolean }> = ({
 )
 
 const ArtistDashboard: React.FC = () => {
-  const profileItems = [
-    { title: 'Profile Photo', completed: true },
-    { title: 'Personal Bio', completed: true },
-    { title: 'Skills & Talents', completed: true },
-    { title: 'Portfolio', completed: true },
-    { title: 'Location', completed: true },
-    { title: 'Contact Info', completed: true },
+  const [profileItems, setProfileItems] = useState<
+    { title: string; completed: boolean }[]
+  >([
+    { title: 'Profile Photo', completed: false },
+    { title: 'Personal Bio', completed: false },
+    { title: 'Skills & Talents', completed: false },
+    { title: 'Portfolio', completed: false },
+    { title: 'Location', completed: false },
+    { title: 'Contact Info', completed: false },
     { title: 'Social Media Links', completed: false },
     { title: 'Work Experience', completed: false },
-  ]
+  ])
+
+  useEffect(() => {
+    const fetchCompletion = async () => {
+      try {
+        const data = await artistService.getMyCompleteProfile()
+        const completedItems = [
+          { title: 'Profile Photo', completed: Boolean(data?.profilePhoto || data?.avatarUrl) },
+          { title: 'Personal Bio', completed: Boolean(data?.bio) },
+          { title: 'Skills & Talents', completed: Array.isArray(data?.skills) ? data!.skills!.length > 0 : Boolean(data?.skills) },
+          { title: 'Portfolio', completed: Boolean((data as any)?.portfolioUrl) },
+          { title: 'Location', completed: Boolean((data as any)?.location || (data as any)?.city) },
+          { title: 'Contact Info', completed: Boolean(data?.email || (data as any)?.phone) },
+          { title: 'Social Media Links', completed: Boolean((data as any)?.socialLinks) },
+          { title: 'Work Experience', completed: Boolean((data as any)?.experienceYears) },
+        ]
+        setProfileItems(completedItems)
+      } catch (e) {
+        // If the complete profile endpoint fails, try basic profile
+        try {
+          const data = await artistService.getMyProfile()
+          const completedItems = [
+            { title: 'Profile Photo', completed: Boolean(data?.profilePhoto || data?.avatarUrl) },
+            { title: 'Personal Bio', completed: Boolean(data?.bio) },
+            { title: 'Skills & Talents', completed: Array.isArray((data as any)?.skills) ? (data as any).skills.length > 0 : Boolean((data as any)?.skills) },
+            { title: 'Portfolio', completed: Boolean((data as any)?.portfolioUrl) },
+            { title: 'Location', completed: Boolean((data as any)?.location || (data as any)?.city) },
+            { title: 'Contact Info', completed: Boolean(data?.email || (data as any)?.phone) },
+            { title: 'Social Media Links', completed: Boolean((data as any)?.socialLinks) },
+            { title: 'Work Experience', completed: Boolean((data as any)?.experienceYears) },
+          ]
+          setProfileItems(completedItems)
+        } catch {
+          // keep defaults
+        }
+      }
+    }
+    fetchCompletion()
+  }, [])
+
   const completionPercentage =
     (profileItems.filter(i => i.completed).length / profileItems.length) * 100
 

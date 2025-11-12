@@ -10,6 +10,7 @@ import {
 } from '../../components/icons/IconComponents'
 import { Pagination } from '../../components/Pagination'
 import { useNavigate } from 'react-router-dom'
+import recruiterJobsService, { CreateJobInput } from '../../services/recruiterJobsService'
 
 const getStatusStyles = (status: Job['status']) => {
   switch (status) {
@@ -178,7 +179,7 @@ export const PostJobPage = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'All' | Job['status']>('All')
   const [typeFilter, setTypeFilter] = useState<'All' | Job['type']>('All')
-  const [jobs, setJobs] = useState<Job[]>(initialJobs)
+  const [jobs, setJobs] = useState<Job[]>([])
   const navigate = useNavigate()
 
   const ITEMS_PER_PAGE = 5
@@ -199,6 +200,49 @@ export const PostJobPage = () => {
   useEffect(() => {
     setCurrentPage(1)
   }, [searchTerm, statusFilter, typeFilter])
+
+  useEffect(() => {
+    const mapJobDtoToUi = (dto: any): Job => {
+      const typeMap: Record<string, Job['type']> = {
+        FULL_TIME: 'Full-time',
+        PART_TIME: 'Part-time',
+        CONTRACT: 'Contract',
+        FREELANCE: 'Freelance',
+        INTERNSHIP: 'Contract',
+        PROJECT_BASED: 'Contract',
+      }
+      const statusMap: Record<string, Job['status']> = {
+        ACTIVE: 'Active',
+        DRAFT: 'Draft',
+        CLOSED: 'Closed',
+      }
+      const createdAtIso = dto.createdAt ?? new Date().toISOString()
+      return {
+        id: dto.id,
+        title: dto.title,
+        type: typeMap[dto.jobType] ?? 'Contract',
+        applicants: dto.applicationsCount ?? 0,
+        status: statusMap[dto.status] ?? 'Active',
+        postedDate: formatDate(createdAtIso),
+        createdDate: createdAtIso,
+        description: dto.description,
+        skills: Array.isArray(dto.skillsRequired) ? dto.skillsRequired.join(', ') : undefined,
+        boosted: false,
+      }
+    }
+
+    const fetchJobs = async () => {
+      try {
+        const page = await recruiterJobsService.listMyJobs({ page: 0, size: 10 })
+        const mapped = page.items.map(mapJobDtoToUi)
+        setJobs(mapped)
+      } catch (err) {
+        // Fallback to mock data if API fails
+        setJobs(initialJobs)
+      }
+    }
+    fetchJobs()
+  }, [])
 
   const handleViewApplicants = (job: Job) => {
     navigate('/applicants', { state: { job } })
@@ -221,10 +265,54 @@ export const PostJobPage = () => {
     setActiveDropdown(null)
   }
 
-  const handleSaveJob = (jobData: Job) => {
-    if (jobData.id) {
-      setJobs(jobs.map(j => (j.id === jobData.id ? { ...j, ...jobData } : j)))
-    } else {
+  const handleSaveJob = async (jobData: Job) => {
+    const toEnum = (t: Job['type']): CreateJobInput['jobType'] => {
+      switch (t) {
+        case 'Full-time':
+          return 'FULL_TIME'
+        case 'Part-time':
+          return 'PART_TIME'
+        case 'Freelance':
+          return 'FREELANCE'
+        case 'Contract':
+        default:
+          return 'CONTRACT'
+      }
+    }
+
+    try {
+      if (jobData.id) {
+        // Local edit only (UI fields subset). Backend update can be added when edit flow expands.
+        setJobs(jobs.map(j => (j.id === jobData.id ? { ...j, ...jobData } : j)))
+      } else {
+        const skillsArray = (jobData.skills || '')
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean)
+        const payload: CreateJobInput = {
+          title: jobData.title,
+          description: jobData.description || '',
+          jobType: toEnum(jobData.type),
+          experienceLevel: 'ENTRY_LEVEL',
+          skillsRequired: skillsArray,
+        }
+        const created = await recruiterJobsService.createJob(payload)
+        const newJob: Job = {
+          id: created.id,
+          title: created.title,
+          type: jobData.type,
+          applicants: created.applicationsCount ?? 0,
+          status: created.status === 'ACTIVE' ? 'Active' : 'Draft',
+          createdDate: created.createdAt ?? new Date().toISOString(),
+          postedDate: created.createdAt ? formatDate(created.createdAt) : 'Just now',
+          description: created.description,
+          skills: Array.isArray(created.skillsRequired) ? created.skillsRequired.join(', ') : jobData.skills,
+          boosted: false,
+        }
+        setJobs([newJob, ...jobs])
+      }
+    } catch (e) {
+      // Fallback to local add on error
       const newJob = {
         ...jobData,
         id: Date.now(),

@@ -1,117 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { Card } from '../../components/Card'
-import { Hire } from '../../types'
+import { RecentHireDto, getHires } from '../../services/recruiterHiresService'
 import { Pagination } from '../../components/Pagination'
 import { SearchIcon } from '../../components/icons/IconComponents'
 import { useNavigate } from 'react-router-dom'
 
-const pastHires: Hire[] = [
-  {
-    id: 1,
-    artist: {
-      id: 5,
-      name: 'Elaine Benes',
-      avatarUrl: 'https://picsum.photos/seed/elaine/100/100',
-      bio: 'Witty and sharp copywriter with a knack for creating compelling narratives for catalogs and campaigns.',
-      skills: ['Copywriting', 'Editing', 'Content Strategy'],
-      email: 'elaine.b@example.com',
-      portfolioUrl: 'https://jpeterman.com',
-    },
-    jobTitle: 'Creative Copywriter',
-    jobId: 4,
-    hiredDate: 'June 15, 2024',
-  },
-  {
-    id: 2,
-    artist: {
-      id: 108,
-      name: 'Nina Simone',
-      avatarUrl: 'https://picsum.photos/seed/simone/100/100',
-      bio: 'Legendary musician and sound artist.',
-      skills: ['Pro Tools', 'Sound Design', 'Mixing'],
-      email: 'nina.s@example.com',
-      portfolioUrl: 'https://ninasimone.com',
-    },
-    jobTitle: 'Sound Designer',
-    jobId: 8,
-    hiredDate: 'May 20, 2024',
-  },
-  {
-    id: 3,
-    artist: {
-      id: 2,
-      name: 'John Appleseed',
-      avatarUrl: 'https://picsum.photos/seed/john/100/100',
-      bio: 'Creative illustrator and animator who brings stories to life with vibrant visuals and compelling motion graphics.',
-      skills: ['Illustration', 'Animation', 'After Effects'],
-      email: 'john.appleseed@example.com',
-      portfolioUrl: 'https://behance.net/example',
-    },
-    jobTitle: 'Lead Illustrator',
-    jobId: 2,
-    hiredDate: 'April 01, 2024',
-  },
-  {
-    id: 4,
-    artist: {
-      id: 1,
-      name: 'Lana Steiner',
-      avatarUrl: 'https://picsum.photos/seed/lana/100/100',
-      bio: 'A passionate product designer with 5+ years of experience creating intuitive and beautiful user experiences for B2B and B2C products.',
-      skills: ['UI/UX Design', 'Figma', 'Prototyping'],
-      email: 'lana.steiner@example.com',
-      portfolioUrl: 'https://dribbble.com/example',
-    },
-    jobTitle: 'Senior Product Designer',
-    jobId: 1,
-    hiredDate: 'February 10, 2024',
-  },
-  {
-    id: 5,
-    artist: {
-      id: 4,
-      name: 'George Costanza',
-      avatarUrl: 'https://picsum.photos/seed/george/100/100',
-      bio: 'Architectural photographer with a keen eye for detail, light, and form.',
-      skills: ['Architectural Design', 'Photography'],
-      email: 'george.c@example.com',
-      portfolioUrl: 'https://vandelayindustries.com',
-    },
-    jobTitle: 'Architectural Photographer',
-    jobId: 5,
-    hiredDate: 'January 05, 2024',
-  },
-  {
-    id: 6,
-    artist: {
-      id: 109,
-      name: 'Max Richter',
-      avatarUrl: 'https://picsum.photos/seed/richter/100/100',
-      bio: 'Composer and motion graphics enthusiast.',
-      skills: ['After Effects', 'Cinema 4D'],
-      email: 'max.r@example.com',
-      portfolioUrl: 'https://maxrichter.com',
-    },
-    jobTitle: 'Motion Graphics Artist',
-    jobId: 6,
-    hiredDate: 'December 12, 2023',
-  },
-  {
-    id: 7,
-    artist: {
-      id: 110,
-      name: 'Jane Doe',
-      avatarUrl: 'https://picsum.photos/seed/jane/100/100',
-      bio: 'Aspiring designer with a passion for clean UIs.',
-      skills: ['Figma', 'Sketch'],
-      email: 'jane.d@example.com',
-      portfolioUrl: 'https://janedoe.design',
-    },
-    jobTitle: 'Junior UI Designer',
-    jobId: 7,
-    hiredDate: 'November 22, 2023',
-  },
-]
+// Server returns ISO dates; format for display
+const formatDate = (iso?: string) =>
+  iso ? new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : '—'
 
 export const PastHiresPage = () => {
   const [currentPage, setCurrentPage] = useState(1)
@@ -119,20 +15,25 @@ export const PastHiresPage = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [jobFilter, setJobFilter] = useState('All')
   const ITEMS_PER_PAGE = 5
+  const [hires, setHires] = useState<RecentHireDto[]>([])
+  const [totalElements, setTotalElements] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const jobTitles = useMemo(() => {
-    const titles = pastHires.map(hire => hire.jobTitle)
+    const titles = hires.map(hire => hire.jobTitle)
     return ['All', ...Array.from(new Set(titles))]
-  }, [])
+  }, [hires])
 
   const filteredHires = useMemo(() => {
-    return pastHires.filter(hire => {
+    return hires.filter(hire => {
       const searchLower = searchTerm.toLowerCase()
       const matchesSearch =
         searchLower === '' ||
-        hire.artist.name.toLowerCase().includes(searchLower) ||
+        (hire.artistName || '').toLowerCase().includes(searchLower) ||
         hire.jobTitle.toLowerCase().includes(searchLower) ||
-        hire.artist.skills.join(' ').toLowerCase().includes(searchLower)
+        (hire.artistCategory || '').toLowerCase().includes(searchLower)
 
       const matchesJob = jobFilter === 'All' || hire.jobTitle === jobFilter
 
@@ -144,16 +45,33 @@ export const PastHiresPage = () => {
     setCurrentPage(1)
   }, [searchTerm, jobFilter])
 
+  useEffect(() => {
+    const fetchHires = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const res = await getHires({ page: currentPage - 1, size: ITEMS_PER_PAGE })
+        setHires(res.items)
+        setTotalElements(res.totalElements)
+        setTotalPages(res.totalPages)
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load hires')
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchHires()
+  }, [currentPage])
+
   const handleClearFilters = () => {
     setSearchTerm('')
     setJobFilter('All')
   }
 
-  const indexOfLastHire = currentPage * ITEMS_PER_PAGE
-  const indexOfFirstHire = indexOfLastHire - ITEMS_PER_PAGE
-  const currentHires = filteredHires.slice(indexOfFirstHire, indexOfLastHire)
+  // Server-side pagination; filter applies within current page
+  const currentHires = filteredHires
 
-  const handleViewDetails = (hire: Hire) => {
+  const handleViewDetails = (hire: RecentHireDto) => {
     navigate('/past-hires', { state: { hire } })
   }
 
@@ -237,24 +155,34 @@ export const PastHiresPage = () => {
               </tr>
             </thead>
             <tbody className='bg-white divide-y divide-gray-200'>
-              {currentHires.length > 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={4} className='text-center py-8 px-6 text-sm text-gray-500'>
+                    Loading hires...
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={4} className='text-center py-8 px-6 text-sm text-red-600'>
+                    {error}
+                  </td>
+                </tr>
+              ) : currentHires.length > 0 ? (
                 currentHires.map(hire => (
                   <tr key={hire.id} className='hover:bg-gray-50'>
                     <td className='px-6 py-4 whitespace-nowrap'>
                       <div className='flex items-center'>
                         <div className='flex-shrink-0 h-11 w-11'>
-                          <img
-                            className='h-11 w-11 rounded-full object-cover'
-                            src={hire.artist.avatarUrl}
-                            alt={hire.artist.name}
-                          />
+                          <div className='h-11 w-11 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs'>
+                            {hire.artistName?.charAt(0) || '?'}
+                          </div>
                         </div>
                         <div className='ml-4'>
                           <div className='text-sm font-semibold text-gray-900'>
-                            {hire.artist.name}
+                            {hire.artistName || 'Unknown Artist'}
                           </div>
                           <div className='text-sm text-gray-500'>
-                            {hire.artist.skills.slice(0, 3).join(', ')}
+                            {hire.artistEmail || '—'}
                           </div>
                         </div>
                       </div>
@@ -265,7 +193,7 @@ export const PastHiresPage = () => {
                       </div>
                     </td>
                     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-500'>
-                      {hire.hiredDate}
+                      {formatDate(hire.hiredAt)}
                     </td>
                     <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
                       <button
@@ -292,10 +220,10 @@ export const PastHiresPage = () => {
             </tbody>
           </table>
         </div>
-        {filteredHires.length > 0 && (
+        {totalElements > 0 && (
           <Pagination
             currentPage={currentPage}
-            totalItems={filteredHires.length}
+            totalItems={totalElements}
             itemsPerPage={ITEMS_PER_PAGE}
             onPageChange={page => setCurrentPage(page)}
           />

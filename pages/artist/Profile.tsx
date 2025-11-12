@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import Icon from '@/components/Icon'
 import { ArtistCategory } from '@/types'
+import artistService from '@/services/artistService'
 
 interface ArtistProfile {
   category: ArtistCategory
@@ -35,28 +36,35 @@ const Profile: React.FC = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        // In a real app, you would fetch this from your API
-        // const data = await onboardingService.getProfile()
-        // setProfile(data)
-        
-        // Mock data for demo
-        const mockProfile: ArtistProfile = {
-          category: ArtistCategory.Dancer,
-          fullName: 'Priya Patel',
-          email: 'priya.patel@example.com',
-          phone: '+91 98765 43210',
-          gender: 'Female',
-          city: 'Mumbai',
-          languages: 'English, Hindi, Gujarati',
-          bio: 'Professional dancer with 8+ years of experience in Bollywood and contemporary dance styles. Trained at Shiamak Davar Institute and worked on multiple Bollywood films and live performances.',
-          profilePhoto: 'https://picsum.photos/300/300?random=1',
-          danceStyles: ['Bollywood', 'Contemporary', 'Hip Hop'],
-          experienceYears: '8',
-          danceVideo: 'https://www.youtube.com/embed/example',
+        const data = await artistService.getMyProfile()
+        if (!data) {
+          setProfile(null)
+          return
         }
-        setProfile(mockProfile)
+        const normalized: ArtistProfile = {
+          category: (data.category as ArtistCategory) ?? ArtistCategory.Actor,
+          fullName: data.fullName ?? data.name ?? '',
+          email: data.email ?? '',
+          phone: data.phone ?? '',
+          gender: (data.gender as string) ?? '',
+          city: (data.city as string) ?? '',
+          languages: Array.isArray(data.languages)
+            ? (data.languages as string[]).join(', ')
+            : (data.languages as string) ?? '',
+          bio: data.bio ?? '',
+          profilePhoto: data.profilePhoto ?? data.avatarUrl ?? undefined,
+          actorType: data.actorType,
+          age: data.age as number | undefined,
+          height: data.height as string | undefined,
+          weight: (data.weight as number | undefined) ?? undefined,
+          danceStyles: (data.danceStyles as string[] | undefined) ?? undefined,
+          experienceYears: (data.experienceYears as string | number | undefined) ?? undefined,
+          danceVideo: (data.danceVideo as string | undefined) ?? undefined,
+        }
+        setProfile(normalized)
       } catch (error) {
         console.error('Error fetching profile:', error)
+        setProfile(null)
       } finally {
         setLoading(false)
       }

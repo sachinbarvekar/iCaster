@@ -77,8 +77,22 @@ export const onboardingService = {
     { id: string; name: string; description: string }[]
   > {
     try {
-      const response = await api.get('/api/artist/categories')
-      return response.data
+      // Fetch active artist types from public endpoint
+      const response = await api.get('/public/artist-types')
+      const data = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response.data?.items)
+        ? response.data.items
+        : Array.isArray(response.data?.content)
+        ? response.data.content
+        : response.data?.data || []
+
+      // Normalize to expected shape
+      return (data || []).map((it: any) => ({
+        id: String(it.id ?? it.artistTypeId ?? it.typeId ?? ''),
+        name: String(it.name ?? it.typeName ?? 'Unknown'),
+        description: String(it.description ?? it.summary ?? ''),
+      }))
     } catch (error) {
       console.error('Failed to fetch categories:', error)
       throw new Error('Failed to load categories. Please try again.')

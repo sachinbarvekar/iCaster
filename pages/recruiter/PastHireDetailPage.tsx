@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Card } from '../../components/Card'
 import {
   MailIcon,
@@ -7,11 +7,19 @@ import {
   BriefcaseIcon,
 } from '../../components/icons/IconComponents'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { Artist } from '../../types'
+import { getArtistProfileById } from '@/services/artistProfileService'
+
+const formatDate = (iso?: string) =>
+  iso ? new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : '—'
 
 export const PastHireDetailPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const hire = location.state.hire
+  const [artistProfile, setArtistProfile] = useState<Artist | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   if (!hire) {
     return (
@@ -31,7 +39,22 @@ export const PastHireDetailPage = () => {
     )
   }
 
-  const { artist, jobTitle, hiredDate } = hire
+  useEffect(() => {
+    const run = async () => {
+      if (!hire?.artistId) return
+      try {
+        setLoading(true)
+        setError(null)
+        const profile = await getArtistProfileById(hire.artistId)
+        setArtistProfile(profile)
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load artist profile')
+      } finally {
+        setLoading(false)
+      }
+    }
+    run()
+  }, [hire?.artistId])
 
   return (
     <div>
@@ -61,18 +84,27 @@ export const PastHireDetailPage = () => {
         <div className='lg:col-span-2 space-y-8'>
           <Card>
             <div className='flex items-start space-x-6'>
-              <img
-                className='h-28 w-28 rounded-full object-cover ring-4 ring-white'
-                src={artist.avatarUrl}
-                alt={artist.name}
-              />
+              {artistProfile?.avatarUrl ? (
+                <img
+                  className='h-28 w-28 rounded-full object-cover ring-4 ring-white'
+                  src={artistProfile.avatarUrl}
+                  alt={artistProfile.name}
+                />
+              ) : (
+                <div className='h-28 w-28 rounded-full bg-gray-200 ring-4 ring-white flex items-center justify-center text-2xl text-gray-500'>
+                  {(artistProfile?.name || hire.artistName || '?').charAt(0)}
+                </div>
+              )}
               <div className='pt-2'>
                 <h3 className='text-2xl font-bold text-gray-900'>
-                  {artist.name}
+                  {artistProfile?.name || hire.artistName || 'Unknown Artist'}
                 </h3>
                 <p className='text-md text-gray-600 leading-relaxed mt-2'>
-                  {artist.bio || 'No biography provided.'}
+                  {artistProfile?.bio || 'No biography provided.'}
                 </p>
+                {error && (
+                  <p className='text-sm text-red-600 mt-2'>{error}</p>
+                )}
               </div>
             </div>
           </Card>
@@ -80,13 +112,17 @@ export const PastHireDetailPage = () => {
           <Card>
             <h4 className='text-lg font-semibold text-gray-800 mb-4'>Skills</h4>
             <div className='flex flex-wrap gap-2'>
-              {artist.skills.map(skill => (
-                <span
-                  key={skill}
-                  className='px-3 py-1.5 text-sm font-medium bg-primary-light text-primary rounded-full'>
-                  {skill}
-                </span>
-              ))}
+              {(artistProfile?.skills || []).length > 0 ? (
+                (artistProfile?.skills || []).map(skill => (
+                  <span
+                    key={skill}
+                    className='px-3 py-1.5 text-sm font-medium bg-primary-light text-primary rounded-full'>
+                    {skill}
+                  </span>
+                ))
+              ) : (
+                <span className='text-sm text-gray-500'>No skills listed.</span>
+              )}
             </div>
           </Card>
         </div>
@@ -103,7 +139,7 @@ export const PastHireDetailPage = () => {
                   <span className='text-gray-500'>Hired for</span>
                   <br />
                   <span className='text-gray-800 font-semibold'>
-                    {jobTitle}
+                    {hire.jobTitle}
                   </span>
                 </div>
               </li>
@@ -113,7 +149,7 @@ export const PastHireDetailPage = () => {
                   <span className='text-gray-500'>Hired on</span>
                   <br />
                   <span className='text-gray-800 font-semibold'>
-                    {hiredDate}
+                    {formatDate(hire.hiredAt)}
                   </span>
                 </div>
               </li>
@@ -124,25 +160,25 @@ export const PastHireDetailPage = () => {
               Contact & Links
             </h4>
             <ul className='space-y-3 text-sm'>
-              {artist.email && (
+              {(artistProfile?.email || hire.artistEmail) && (
                 <li className='flex items-center'>
                   <MailIcon className='h-5 w-5 text-gray-400 mr-3' />
                   <a
-                    href={`mailto:${artist.email}`}
+                    href={`mailto:${artistProfile?.email || hire.artistEmail}`}
                     className='text-primary hover:underline'>
-                    {artist.email}
+                    {artistProfile?.email || hire.artistEmail}
                   </a>
                 </li>
               )}
-              {artist.portfolioUrl && (
+              {(artistProfile?.portfolioUrl) && (
                 <li className='flex items-center'>
                   <LinkIcon className='h-5 w-5 text-gray-400 mr-3' />
                   <a
-                    href={artist.portfolioUrl}
+                    href={artistProfile.portfolioUrl}
                     target='_blank'
                     rel='noopener noreferrer'
                     className='text-primary hover:underline truncate'>
-                    {artist.portfolioUrl.replace(/^https?:\/\//, '')}
+                    {artistProfile.portfolioUrl.replace(/^https?:\/\//, '')}
                   </a>
                 </li>
               )}

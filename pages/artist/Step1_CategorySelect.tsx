@@ -91,18 +91,18 @@ const Step1_CategorySelect: React.FC<CategorySelectProps> = ({
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        // const data = await onboardingService.getCategories()
-        // // Map API response to our expected format
-        // const mappedCategories = data.map(cat => ({
-        //   id: cat.id,
-        //   name: cat.name as ArtistCategory,
-        //   icon: mapCategoryToIcon(cat.name as ArtistCategory),
-        //   description: cat.description,
-        // }))
-        setCategories(fallbackCategories)
+        const data = await onboardingService.getCategories()
+        const mappedCategories = data.map(cat => ({
+          id: cat.id,
+          name: (cat.name as ArtistCategory) ?? ArtistCategory.Actor,
+          icon: mapCategoryToIcon((cat.name as ArtistCategory) ?? ArtistCategory.Actor),
+          description: cat.description,
+        }))
+        setCategories(mappedCategories.length ? mappedCategories : fallbackCategories)
       } catch (error) {
         console.error('Failed to load categories, using fallback', error)
         // toast.error('Failed to load categories. Using default options.');
+        setCategories(fallbackCategories)
       } finally {
         setIsLoading(false)
       }

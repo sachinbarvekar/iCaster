@@ -81,6 +81,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const navigate = useNavigate()
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
 
   const dropdownRef = useRef<HTMLDivElement>(null)
   const notificationRef = useRef<HTMLDivElement>(null)
@@ -92,6 +93,17 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const role = localStorage.getItem('role')
   const user = localStorage.getItem('user')
   console.log(role, user)
+
+  useEffect(() => {
+    try {
+      const storedUser = userService.getStoredUser()
+      if (storedUser?.email) {
+        setUserEmail(storedUser.email)
+      }
+    } catch (e) {
+      // ignore parse errors
+    }
+  }, [])
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -226,7 +238,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             />
             <div className='hidden md:block text-left'>
               <p className='text-sm font-semibold text-gray-800'>
-                {recruiter.name}
+              {userEmail ?? recruiter.email}
               </p>
               <p className='text-xs text-gray-500'>{role}</p>
             </div>
@@ -242,10 +254,10 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               <div className='py-1'>
                 <div className='px-4 py-3 border-b border-gray-100'>
                   <p className='text-sm font-semibold text-gray-900 leading-tight'>
-                    {recruiter.name}
+                     {userEmail ?? recruiter.email}
                   </p>
                   <p className='text-sm text-gray-500 truncate'>
-                    {recruiter.email}
+                    {userEmail ?? recruiter.email}
                   </p>
                 </div>
                 <button
